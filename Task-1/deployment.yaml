@@ -33,7 +33,10 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - |
-          echo "hello in MLOPS MENA COMMUNITY : $(date +'%Y-%m-%d %H:%M:%S')" > /usr/share/nginx/html/index.html
+          mkdir -p /usr/share/nginx/html/task-1
+          TS="hello in MLOPS MENA COMMUNITY : $(date +'%Y-%m-%d %H:%M:%S')"
+          echo "$TS" > /usr/share/nginx/html/index.html
+          echo "$TS" > /usr/share/nginx/html/task-1/index.html
           exec nginx -g "daemon off;"
         ports:
         - containerPort: 80
@@ -46,7 +49,10 @@ spec:
           while true; do
             PID=$(pgrep -o nginx || true)
             if [ -n "$PID" ] && [ -d "/proc/$PID/root/usr/share/nginx/html" ]; then
-              echo "hello in MLOPS MENA COMMUNITY : $(date +'%Y-%m-%d %H:%M:%S')" > "/proc/$PID/root/usr/share/nginx/html/index.html"
+              TS="hello in MLOPS MENA COMMUNITY : $(date +'%Y-%m-%d %H:%M:%S')"
+              echo "$TS" > "/proc/$PID/root/usr/share/nginx/html/index.html"
+              mkdir -p "/proc/$PID/root/usr/share/nginx/html/task-1"
+              echo "$TS" > "/proc/$PID/root/usr/share/nginx/html/task-1/index.html"
             fi
             sleep 5
           done

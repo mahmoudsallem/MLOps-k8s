@@ -17,7 +17,7 @@ MLOps-k8s/
     ├── pod.yaml                       # Multi-container Pod (Init + Nginx + Sidecar)
     ├── deployment.yaml                # 3-replica Deployment across nodes
     ├── service.yaml                   # ClusterIP Service on port 80
-    ├── ingress.yaml                   # Ingress resource for UI browser access
+    ├── ingress.yaml                   # Ingress resource for /task-1 and host task-1
     ├── pod-failure.yaml               # Diagnostic Pod simulating init failure
     └── failure-patch.yaml             # Deployment failure patch for zero-downtime test
 ```
@@ -55,12 +55,13 @@ kubectl apply -f Task-1/pod.yaml
 ### 3. Access the UI Lab
 Open your web browser at:
 ```
-http://localhost/
+http://localhost/task-1
 ```
 or
 ```
-http://127.0.0.1/
+http://127.0.0.1/task-1
 ```
+*(or `http://task-1/` if mapped in your hosts file)*
 
 You will see:
 ```text

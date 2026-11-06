@@ -18,7 +18,8 @@
    - [1. Deploying the Multi-Container Pod](#1-deploying-the-multi-container-pod)
    - [2. Deploying the Multi-Node Deployment, Service & Ingress](#2-deploying-the-multi-node-deployment-service--ingress)
 6. [Verification & Dynamic Timestamp Updates](#-verification--dynamic-timestamp-updates)
-   - [Local Browser UI Lab](#local-browser-ui-lab)
+   - [Accessing via `http://localhost/task-1` (Path-based)](#accessing-via-httplocalhosttask-1-path-based)
+   - [Accessing via `http://task-1` (Host-based)](#accessing-via-httptask-1-host-based)
    - [Live CLI / Curl Verification](#live-cli--curl-verification)
 7. [Failure Simulation & Kubernetes Lifecycle Analysis](#-failure-simulation--kubernetes-lifecycle-analysis)
    - [1. Pod-Level Init Failure (Init:CrashLoopBackOff)](#1-pod-level-init-failure-initcrashloopbackoff)
@@ -43,7 +44,7 @@ hello in MLOPS MENA COMMUNITY : 2026-10-15 10:15:05
   1. `init-done` (Init Container)
   2. `nginx` (Main Web Server)
   3. `time-updater` (Sidecar Dynamic Updater)
-- **Networking**: Kubernetes `Service` and `Ingress` exposing the application on port `80` (`http://localhost` / `http://127.0.0.1`).
+- **Networking**: Kubernetes `Service` and `Ingress` exposing the application both on path `/task-1` (`http://localhost/task-1`) and host `task-1` (`http://task-1/`).
 - **Failure Lifecycle**: Simulate an init container failure (`exit 1`), inspect `Init:CrashLoopBackOff`, prove zero downtime under a rolling update, and restore service.
 
 ---
@@ -58,7 +59,7 @@ flowchart TD
         end
 
         subgraph AppPhase["Phase 2: Running App Containers"]
-            Main["nginx (nginx:alpine)\nPID X in shared namespace\nServes /usr/share/nginx/html/index.html\nPort 80"]
+            Main["nginx (nginx:alpine)\nPID X in shared namespace\nServes /usr/share/nginx/html/task-1/index.html\nPort 80"]
             Sidecar["time-updater (busybox:1.36)\nFinds NGINX_PID via pgrep\nWrites every 5s to /proc/NGINX_PID/root/.../index.html"]
         end
     end
@@ -87,6 +88,7 @@ Because both containers run as `root` (UID 0) within the same PID and user names
 - The sidecar updates `index.html` directly at:
   ```sh
   /proc/$PID/root/usr/share/nginx/html/index.html
+  /proc/$PID/root/usr/share/nginx/html/task-1/index.html
   ```
 - Nginx immediately serves the updated file to incoming HTTP clients without requiring any volume mount.
 
@@ -97,8 +99,8 @@ Because both containers run as `root` (UID 0) within the same PID and user names
 | Container | Role | Image | Command / Logic |
 | :--- | :--- | :--- | :--- |
 | **`init-done`** | **Init Container** | `busybox:1.36` | `echo done && exit 0`<br>Ensures prerequisites are met before app starts. |
-| **`nginx`** | **Main Web Server** | `nginx:alpine` | Writes initial `index.html` with timestamp and executes `nginx -g 'daemon off;'` on port 80. |
-| **`time-updater`** | **Sidecar Container**| `busybox:1.36` | Loops every 5 seconds, locates Nginx PID, and overwrites `/proc/$PID/root/.../index.html` with current timestamp. |
+| **`nginx`** | **Main Web Server** | `nginx:alpine` | Creates `/task-1/index.html` and root `index.html` with current timestamp and runs Nginx on port 80. |
+| **`time-updater`** | **Sidecar Container**| `busybox:1.36` | Loops every 5 seconds, locates Nginx PID, and overwrites `/proc/$PID/root/.../index.html` and `/task-1/index.html` with current timestamp. |
 
 ---
 
@@ -108,7 +110,7 @@ All manifests are stored in this directory:
 - [`pod.yaml`](pod.yaml) — Standalone 3-container Pod with `shareProcessNamespace: true`.
 - [`deployment.yaml`](deployment.yaml) — Production-grade 3-replica Deployment distributed across the 3 worker nodes.
 - [`service.yaml`](service.yaml) — ClusterIP Service exposing port 80.
-- [`ingress.yaml`](ingress.yaml) — Ingress resource routing port 80 traffic to the Service.
+- [`ingress.yaml`](ingress.yaml) — Ingress resource routing both `http://localhost/task-1` and `http://task-1/` to the Service.
 - [`pod-failure.yaml`](pod-failure.yaml) — Diagnostic Pod with forced init failure (`exit 1`) for lifecycle analysis.
 - [`failure-patch.yaml`](failure-patch.yaml) — Patch to demonstrate rolling update zero-downtime and crash diagnosis.
 
@@ -124,12 +126,6 @@ kubectl apply -f Task-1/pod.yaml
 Verify Pod status:
 ```bash
 kubectl get pod mlops-multi-container-pod -o wide
-```
-
-Output:
-```text
-NAME                        READY   STATUS    RESTARTS   AGE   IP           NODE                     NOMINATED NODE   READINESS GATES
-mlops-multi-container-pod   2/2     Running   0          97s   10.42.1.60   k3d-multinodes-agent-1   <none>           <none>
 ```
 
 Inspect the `init-done` init container output:
@@ -173,21 +169,34 @@ kubectl get ingress mlops-nginx-ingress
 
 ## 🧪 Verification & Dynamic Timestamp Updates
 
-### Local Browser UI Lab
-Open any web browser and navigate to:
+### Accessing via `http://localhost/task-1` (Path-based)
+Open any web browser and navigate directly to:
 ```
-http://127.0.0.1/
+http://localhost/task-1
 ```
 or
 ```
-http://localhost/
+http://127.0.0.1/task-1
 ```
 
 The web page displays:
-```
-hello in MLOPS MENA COMMUNITY : 2026-11-06 18:30:38
+```text
+hello in MLOPS MENA COMMUNITY : 2026-11-06 18:41:38
 ```
 Refresh the page after 5 seconds to observe the sidecar updating the timestamp in real-time.
+
+---
+
+### Accessing via `http://task-1` (Host-based)
+If you map `127.0.0.1 task-1` in your operating system's `hosts` file (`C:\Windows\System32\drivers\etc\hosts`), you can also access the service via:
+```
+http://task-1/
+```
+
+Or test via CLI using the `Host` header:
+```bash
+curl.exe -s -4 -H "Host: task-1" http://127.0.0.1/
+```
 
 ---
 
@@ -195,18 +204,18 @@ Refresh the page after 5 seconds to observe the sidecar updating the timestamp i
 Verify dynamic updates directly from terminal:
 ```powershell
 1..3 | ForEach-Object { 
-    curl.exe -s -4 http://127.0.0.1:80
+    curl.exe -s -4 -L http://127.0.0.1/task-1
     Start-Sleep -Seconds 5 
 }
 ```
 
 Terminal Output:
 ```text
-hello in MLOPS MENA COMMUNITY : 2026-11-06 16:30:38
-hello in MLOPS MENA COMMUNITY : 2026-11-06 16:30:43
-hello in MLOPS MENA COMMUNITY : 2026-11-06 16:30:48
+hello in MLOPS MENA COMMUNITY : 2026-11-06 16:41:38
+hello in MLOPS MENA COMMUNITY : 2026-11-06 16:41:43
+hello in MLOPS MENA COMMUNITY : 2026-11-06 16:41:48
 ```
-Notice how every 5 seconds, the sidecar writes the updated timestamp into `/proc/<pid>/root/usr/share/nginx/html/index.html` with zero persistent volumes.
+Notice how every 5 seconds, the sidecar writes the updated timestamp into `/proc/<pid>/root/usr/share/nginx/html/task-1/index.html` with zero persistent volumes.
 
 ---
 
@@ -300,11 +309,11 @@ mlops-nginx-deployment-6c6987b576-46vf7   0/2     Init:Error   2 (14s ago)   19s
 
 Test live traffic while the new pod is crashing:
 ```bash
-curl.exe -s -4 http://127.0.0.1:80
+curl.exe -s -4 http://127.0.0.1/task-1/
 ```
 Output:
 ```text
-hello in MLOPS MENA COMMUNITY : 2026-11-06 16:26:02
+hello in MLOPS MENA COMMUNITY : 2026-11-06 16:41:38
 ```
 
 > **Zero Downtime Guarantee**:
@@ -343,4 +352,4 @@ The failing pod is cleanly terminated and removed from the cluster.
 1. **Process Namespace Sharing (`shareProcessNamespace: true`)**: Enabled inter-container file access via `/proc/<pid>/root` without provisioning shared storage volumes or PVCs.
 2. **Init Container Guarantees**: Kubernetes guarantees that application containers only launch upon successful completion (`exit 0`) of all init containers.
 3. **Resilience & Zero Downtime**: Kubernetes Deployment controllers isolate initialization failures within canary/new pods, shielding end-users from outages during bad deployments.
-4. **Ingress & Service Integration**: Connected external browser traffic seamlessly via Ingress controller to cluster services.
+4. **Ingress Routing**: Configured multi-routing support for both path `/task-1` and host `task-1`.

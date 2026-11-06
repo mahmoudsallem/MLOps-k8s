@@ -8,8 +8,27 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
+  # Host-based routing: http://task-1/
+  - host: task-1
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mlops-nginx-service
+            port:
+              number: 80
+  # Path-based routing: http://localhost/task-1 (and http://127.0.0.1/task-1)
   - http:
       paths:
+      - path: /task-1
+        pathType: Prefix
+        backend:
+          service:
+            name: mlops-nginx-service
+            port:
+              number: 80
       - path: /
         pathType: Prefix
         backend:
