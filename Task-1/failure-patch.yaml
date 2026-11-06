@@ -1,0 +1,6 @@
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: init-done
+        command: ["sh", "-c", "echo 'Simulating init failure...' && exit 1"]

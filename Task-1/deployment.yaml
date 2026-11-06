@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-nginx-deployment
+  namespace: default
+  labels:
+    app: mlops-nginx
+    tier: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mlops-nginx
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: mlops-nginx
+        tier: frontend
+    spec:
+      shareProcessNamespace: true
+      initContainers:
+      - name: init-done
+        image: busybox:1.36
+        command: ["sh", "-c", "echo done && exit 0"]
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "hello in MLOPS MENA COMMUNITY : $(date +'%Y-%m-%d %H:%M:%S')" > /usr/share/nginx/html/index.html
+          exec nginx -g "daemon off;"
+        ports:
+        - containerPort: 80
+          name: http
+      - name: time-updater
+        image: busybox:1.36
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          while true; do
+            PID=$(pgrep -o nginx || true)
+            if [ -n "$PID" ] && [ -d "/proc/$PID/root/usr/share/nginx/html" ]; then
+              echo "hello in MLOPS MENA COMMUNITY : $(date +'%Y-%m-%d %H:%M:%S')" > "/proc/$PID/root/usr/share/nginx/html/index.html"
+            fi
+            sleep 5
+          done
